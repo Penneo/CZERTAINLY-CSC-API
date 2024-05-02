@@ -10,7 +10,7 @@ if [ x"${REMOTE_DEBUG}" != x ] && [ "${REMOTE_DEBUG}" != "false" ]
 then
   java -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005 -jar ./app.jar
 else
-  java -jar ./app.jar --spring.config.location=file:/opt/cscapi/application.yaml
+  java -jar ./app.jar --spring.config.location=classpath:/application.properties,file:/opt/cscapi/application.yaml
 fi
 
 #exec "$@"
