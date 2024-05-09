@@ -3,10 +3,11 @@ package com.czertainly.signserver.csc.configuration;
 import com.czertainly.signserver.csc.api.auth.authn.CscJwtAuthenticationConverter;
 import com.czertainly.signserver.csc.clients.ejbca.ws.EjbcaWsClient;
 import com.czertainly.signserver.csc.clients.signserver.ws.SignserverWsClient;
+import com.czertainly.signserver.csc.common.PatternReplacer;
 import com.czertainly.signserver.csc.common.exceptions.ApplicationConfigurationException;
-import com.czertainly.signserver.csc.model.signserver.CryptoToken;
-import com.czertainly.signserver.csc.signing.configuration.*;
-import com.czertainly.signserver.csc.signing.filter.Worker;
+import com.czertainly.signserver.csc.signing.configuration.WorkerRepository;
+import com.czertainly.signserver.csc.signing.configuration.WorkerWithCapabilities;
+import com.czertainly.signserver.csc.signing.configuration.loader.WorkerConfigurationLoader;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.BasicHttpClientConnectionManager;
@@ -62,19 +63,18 @@ public class ServerConfiguration {
 
     @Bean("signserverMessageSender")
     public HttpComponents5MessageSender signserverHttpComponentsMessageSender(
-            @Value("${signserver.clientKeyStore.storePassword}") String keystorePassword,
-            @Value("${signserver.clientKeyStore.keyPassword}") String keyPassword,
-            @Value("${signserver.clientKeyStore.storePath}") String keystorePath
+            @Value("${signingProvider.signserver.clientKeyStore.storePath}") String keystorePath,
+            @Value("${signingProvider.signserver.clientKeyStore.password}") String password
     ) throws ApplicationConfigurationException {
         KeyStore keyStore;
         try {
             keyStore = KeyStore.getInstance("PKCS12");
             try (InputStream keyStoreInputStream = new FileInputStream(keystorePath)) {
-                keyStore.load(keyStoreInputStream, keystorePassword.toCharArray());
+                keyStore.load(keyStoreInputStream, password.toCharArray());
             }
 
             SSLContext sslContext = SSLContexts.custom()
-                                               .loadKeyMaterial(keyStore, keyPassword.toCharArray())
+                                               .loadKeyMaterial(keyStore, password.toCharArray())
                                                .build();
 
 
@@ -102,19 +102,18 @@ public class ServerConfiguration {
 
     @Bean("ejbcaMessageSender")
     public HttpComponents5MessageSender ejbcaHttpComponentsMessageSender(
-            @Value("${ejbca.clientKeyStore.storePassword}") String keystorePassword,
-            @Value("${ejbca.clientKeyStore.keyPassword}") String keyPassword,
-            @Value("${ejbca.clientKeyStore.storePath}") String keystorePath
+            @Value("${caProvider.ejbca.clientKeyStore.storePath}") String keystorePath,
+            @Value("${caProvider.ejbca.clientKeyStore.password}") String password
     ) throws ApplicationConfigurationException {
         KeyStore keyStore;
         try {
             keyStore = KeyStore.getInstance("PKCS12");
             try (InputStream keyStoreInputStream = new FileInputStream(keystorePath)) {
-                keyStore.load(keyStoreInputStream, keystorePassword.toCharArray());
+                keyStore.load(keyStoreInputStream, password.toCharArray());
             }
 
             SSLContext sslContext = SSLContexts.custom()
-                                               .loadKeyMaterial(keyStore, keyPassword.toCharArray())
+                                               .loadKeyMaterial(keyStore, password.toCharArray())
                                                .build();
 
 
@@ -157,7 +156,7 @@ public class ServerConfiguration {
     @Bean
     public SignserverWsClient signserverWSClient(@Qualifier("signserverWsMarshaller") Jaxb2Marshaller marshaller,
                                                  @Qualifier("signserverMessageSender") HttpComponents5MessageSender httpComponentsMessageSender,
-                                                 @Value("${signserver.url}") String signserverUrl
+                                                 @Value("${signingProvider.signserver.url}") String signserverUrl
     ) {
         SignserverWsClient client = new SignserverWsClient(signserverUrl);
         client.setMarshaller(marshaller);
@@ -168,19 +167,18 @@ public class ServerConfiguration {
 
     @Bean
     public HttpComponentsClientHttpRequestFactory requestFactory(
-            @Value("${signserver.clientKeyStore.storePassword}") String keystorePassword,
-            @Value("${signserver.clientKeyStore.keyPassword}") String keyPassword,
-            @Value("${signserver.clientKeyStore.storePath}") String keystorePath
+            @Value("${signingProvider.signserver.clientKeyStore.storePath}") String storePath,
+            @Value("${signingProvider.signserver.clientKeyStore.password}") String password
     ) throws ApplicationConfigurationException {
         KeyStore keyStore;
         try {
             keyStore = KeyStore.getInstance("PKCS12");
-            try (InputStream keyStoreInputStream = new FileInputStream(keystorePath)) {
-                keyStore.load(keyStoreInputStream, keystorePassword.toCharArray());
+            try (InputStream keyStoreInputStream = new FileInputStream(storePath)) {
+                keyStore.load(keyStoreInputStream, password.toCharArray());
             }
 
             SSLContext sslContext = SSLContexts.custom()
-                                               .loadKeyMaterial(keyStore, keyPassword.toCharArray())
+                                               .loadKeyMaterial(keyStore, password.toCharArray())
                                                .build();
 
 
@@ -207,12 +205,12 @@ public class ServerConfiguration {
     @Bean
     public EjbcaWsClient ejbcaWsClient(@Qualifier("ejbcaWsMarshaller") Jaxb2Marshaller marshaller,
                                        @Qualifier("ejbcaMessageSender") HttpComponents5MessageSender httpComponentsMessageSender,
-                                       @Value("${ejbca.url}") String ejbcaUrl
+                                       @Value("${caProvider.ejbca.url}") String ejbcaUrl,
+                                       @Value("${caProvider.ejbca.ca}") String caName,
+                                       @Value("${caProvider.ejbca.endEntityProfile}") String endEntityProfileName,
+                                       @Value("${caProvider.ejbca.certificateProfile}") String certificateProfileName
     ) {
-        EjbcaWsClient client = new EjbcaWsClient(ejbcaUrl, "DemoClientSubCA_2307RSA",
-                                                 "DemoDocumentSigningEndEntityProfile",
-                                                 "DemoDocumentSigningLongEECertificateProfile"
-        );
+        EjbcaWsClient client = new EjbcaWsClient(ejbcaUrl, caName, endEntityProfileName, certificateProfileName);
         client.setMessageSender(httpComponentsMessageSender);
         client.setMarshaller(marshaller);
         client.setUnmarshaller(marshaller);
@@ -220,19 +218,14 @@ public class ServerConfiguration {
     }
 
     @Bean
-    public WorkerRepository signerSelector() {
-        CryptoToken entrustCryptoToken = new CryptoToken("EntrustSAMCryptoToken", 10);
-        Worker XAdESBBWorker = new Worker("XAdES-Baseline-B", 1009, entrustCryptoToken);
+    public WorkerRepository signerSelector(WorkerConfigurationLoader workerConfigurationLoader) {
+        List<WorkerWithCapabilities> workers = workerConfigurationLoader.getWorkers();
 
-        List<WorkerWithCapabilities> workersWithCapabilities = List.of(
-                new WorkerWithCapabilities(XAdESBBWorker,
-                                           new WorkerCapabilities(List.of("eu_eidas_qes", "eu_eidas_aes"),
-                                                                  SignatureFormat.XAdES, ConformanceLevel.AdES_B_B,
-                                                                  SignaturePackaging.DETACHED
-                                           )
-                )
-        );
+        return new WorkerRepository(workers);
+    }
 
-        return new WorkerRepository(workersWithCapabilities);
+    @Bean("dnProvider")
+    public PatternReplacer usernameProvider(@Value("${caProvider.ejbca.dnPattern}") String dnPattern) {
+        return new PatternReplacer(dnPattern, "Distinguished Name Provider");
     }
 }

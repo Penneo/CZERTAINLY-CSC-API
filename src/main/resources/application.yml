@@ -1,0 +1,39 @@
+csc:
+    workerConfigurationFile: /home/lukas/dev/customers/3key/SignServer-CSC-API/src/main/resources/workers.yml
+
+idp:
+    baseUrl: https://kcac.czertainly.online/realms/IDnow
+    jwksUri: https://kcac.czertainly.online/realms/IDnow/protocol/openid-connect/certs
+    userInfoUrl: https://kcac.czertainly.online/realms/IDnow/protocol/openid-connect/userinfo?schema=openid
+    issuer: https://kcac.czertainly.online/realms/IDnow
+    audience: cscapi
+    clockSkewSeconds: 5
+
+signingProvider:
+    signserver:
+        url: https://localhost/signserver
+        clientKeyStore:
+            storePath: /home/lukas/dev/customers/3key/3Key-SignServer-Full-Docker/lukas-development/docker_data/signserver_management/lukas_czertainly.p12
+            password: lukas.najman # The same password is used for keystore and private key
+
+caProvider:
+    ejbca:
+        url: https://ejbca.3key.company/ejbca
+        clientKeyStore:
+            storePath: /home/lukas/dev/customers/3key/lukas.najman.p12
+            password: lukas.najman
+        usernamePattern: $[name]
+        dnPattern: CN=$[name], UID=$[id]
+        sanPattern: None
+        ca: DemoClientSubCA_2307RSA
+        endEntityProfile: DemoDocumentSigningEndEntityProfile
+        certificateProfile: DemoDocumentSigningLongEECertificateProfile
+
+spring:
+    jackson:
+        default-property-inclusion: NON_NULL
+
+logging:
+    level:
+        com.czertainly.signserver: DEBUG
+        org.springframework.security: DEBUG

@@ -1,0 +1,48 @@
+cryptoTokens:
+    - name: "EntrustSAMCryptoToken"
+      id: 2
+signers:
+    - name: "XAdES-Baseline-B"
+      id: 1009
+      cryptoToken: "EntrustSAMCryptoToken"
+      capabilities:
+        signatureQualifiers:
+          - eu_eidas_qes
+          - eu_eidas_aes
+        signatureFormat: X
+        conformanceLevel: Ades-B-B
+        signaturePackaging: Detached
+        signatureAlgorithms:
+          - SHA256withRSA
+          - SHA384withRSA
+          - SHA512withRSA
+        returnsValidationInfo: false
+    - name: "XAdES-Baseline-B-ValidationData"
+      id: 10013
+      cryptoToken: "EntrustSAMCryptoToken"
+      capabilities:
+        signatureQualifiers:
+          - eu_eidas_qes
+          - eu_eidas_aes
+        signatureFormat: X
+        conformanceLevel: Ades-B-B
+        signaturePackaging: Detached
+        signatureAlgorithms:
+          - SHA256withRSA
+          - SHA384withRSA
+          - SHA512withRSA
+        returnsValidationInfo: true
+    - name: "XAdES-Baseline-LT"
+      id: 1010
+      cryptoToken: "EntrustSAMCryptoToken"
+      capabilities:
+        signatureQualifiers:
+          - eu_eidas_qes
+          - eu_eidas_aes
+        signatureFormat: X
+        conformanceLevel: Ades-B-LT
+        signaturePackaging: Detached
+        signatureAlgorithms:
+          - SHA256withRSA
+          - SHA384withRSA
+          - SHA512withRSA
