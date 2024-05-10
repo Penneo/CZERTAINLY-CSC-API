@@ -11,7 +11,7 @@
     <groupId>com.czertainly</groupId>
     <artifactId>signserver.csc</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>signserver.csc</name>
+    <name>SignServer-CSC-API</name>
     <description>CSC API for Signserver</description>
     <properties>
         <java.version>21</java.version>

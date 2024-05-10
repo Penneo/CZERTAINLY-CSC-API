@@ -1,48 +1,35 @@
+# List of Crypto Tokens referenced in the configuration
+# Crypto Tokens must exist in the SignServer
 cryptoTokens:
+    # - name: Name of the Crypto Token
+    #   id: ID of the Crypto Token
     - name: "EntrustSAMCryptoToken"
       id: 2
+
+# List of Signers referenced in the configuration
+# First matched Signer according to the request will be used for signing
 signers:
-    - name: "XAdES-Baseline-B"
-      id: 1009
+    # - name: Name of the Signer
+    #   id: ID of the Signer
+    #   cryptoToken: Name of the referenced Crypto Token from the list above
+    #   capabilities:
+    #     signatureQualifiers: List of signature qualifiers
+    #     signatureFormat: Signature format
+    #     conformanceLevel: Conformance level
+    #     signaturePackaging: Signature packaging
+    #     signatureAlgorithms: List of signature algorithms
+    #     returnsValidationInfo: Flag to return validation info
+    - name: "ExtCMS-Long"
+      id: 2005
       cryptoToken: "EntrustSAMCryptoToken"
       capabilities:
         signatureQualifiers:
           - eu_eidas_qes
-          - eu_eidas_aes
-        signatureFormat: X
-        conformanceLevel: Ades-B-B
-        signaturePackaging: Detached
+        signatureFormat: P
+        conformanceLevel: Ades-B-T
+        signaturePackaging: Certification
         signatureAlgorithms:
           - SHA256withRSA
           - SHA384withRSA
           - SHA512withRSA
         returnsValidationInfo: false
-    - name: "XAdES-Baseline-B-ValidationData"
-      id: 10013
-      cryptoToken: "EntrustSAMCryptoToken"
-      capabilities:
-        signatureQualifiers:
-          - eu_eidas_qes
-          - eu_eidas_aes
-        signatureFormat: X
-        conformanceLevel: Ades-B-B
-        signaturePackaging: Detached
-        signatureAlgorithms:
-          - SHA256withRSA
-          - SHA384withRSA
-          - SHA512withRSA
-        returnsValidationInfo: true
-    - name: "XAdES-Baseline-LT"
-      id: 1010
-      cryptoToken: "EntrustSAMCryptoToken"
-      capabilities:
-        signatureQualifiers:
-          - eu_eidas_qes
-          - eu_eidas_aes
-        signatureFormat: X
-        conformanceLevel: Ades-B-LT
-        signaturePackaging: Detached
-        signatureAlgorithms:
-          - SHA256withRSA
-          - SHA384withRSA
-          - SHA512withRSA
