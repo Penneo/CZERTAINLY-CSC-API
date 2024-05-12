@@ -1,6 +1,6 @@
 # CSC API configuration
 csc:
-    # The name of the CSC component that will be provided by the Info endpoint
+    # The name of the CSC component that will be provided in the Info endpoint
     name: CSC API
     # The URI of the image file containing the logo of the remote service which SHALL be published online.
     # The image SHALL be in either JPEG or PNG format and not larger than 256x256 pixels.
@@ -35,7 +35,7 @@ signingProvider:
         # URL of the SignServer
         url: https://signserver.example.com/signserver
         # Name of the truststore bundle containing trusted certificates; OPTIONAL
-#        truststoreBundle: trustedcertificates
+        # truststoreBundle: trustedcertificates
         client:
             # Authorization type for the client signing operations
             # BASIC is used for basic authentication, and basic username and password are required
@@ -62,7 +62,7 @@ caProvider:
         # URL of the EJBCA
         url: https://ejbca.example.com/ejbca
         # Name of the truststore bundle containing trusted certificates; OPTIONAL
-#        truststoreBundle: trustedcertificates
+        # truststoreBundle: trustedcertificates
         # Admin keystore configuration for RA operations
         admin:
             # Name of the keystore bundle containing the admin certificate and private key
@@ -84,66 +84,75 @@ caProvider:
             # Certificate profile name to use for the certificate
             certificateProfileName: DemoDocumentSigningEECertificateProfile
 
-# TLS/mTLS configuration
+# TLS/mTLS configuration, disabled by default
 server:
+    # Configuration of the keystore with server certificate and private key
     ssl:
-        enabled: true
-        # Configuration of the keystore with server certificate and private key
+        # Enable or disable TLS
+        enabled: false
+        # Key store type, allowed values: JKS, PKCS12, recommended: PKCS12
         key-store-type: PKCS12
+        # Absolute path to the keystore file, containing the server certificate and private key
         key-store: /opt/cscapi/keystore.p12
+        # Key store password
         key-store-password: password
+        # Alias of the server certificate with private key in the keystore
         key-alias: server
-        key-password: keysecret
-        # Configuration of the truststore with trusted client certificates/CA certificates
-        client-auth: NEED # NEED = mandatory mTLS, WANT = optional mTLS, NONE = no mTLS
+        # Private key password, if different from the keystore password
+        # key-password: password
+        # Client authentication mode, allowed values: NONE, WANT, NEED
+        # NEED = mandatory mTLS, WANT = optional mTLS, NONE = no mTLS
+        client-auth: WANT
+        # Trust store type, allowed values: JKS, PKCS12, recommended: PKCS12
         trust-store-type: PKCS12
+        # Absolute path to the truststore file, containing trusted certificates
         trust-store: /opt/cscapi/truststore.p12
+        # Trust store password
         trust-store-password: password
 
 # Spring configuration
 spring:
+    # Jackson configuration, DO NOT CHANGE if you are not familiar with Jackson
     jackson:
         default-property-inclusion: NON_NULL
+    # Configuration of SSL context for the REST and Web Services clients
     ssl:
         bundle:
             # Sample configuration of a truststore using PEM encoded certificate or certificate chain
             # pem:
                 # trustedcertificates:
                 #    truststore:
-                #        certificate: /home/lukas/Downloads/signserver-3key-company.pem
-
+                #        certificate: /opt/cscapi/trusted-ca-certs.pem
             jks:
-                # Sample configuration of a truststore using PKCS12 keystore
-                # trustedcertificates:
-                #   truststore:
-                #   type: "PKCS12"
-                #   location: /opt/cscapi/truststore.p12
-                #   password: password
-
+                # Sample configuration of keystore using PKCS12 keystore
+                # ejbcaAdmin: # Name of the keystore bundle
+                #     keystore:
+                #         type: "PKCS12" # Keystore type, allowed values: JKS, PKCS12
+                #         location: /opt/cscapi/admin-keystore.p12 # Absolute path to the keystore file
+                #         password: password # Keystore password
                 ejbcaAdmin:
                     keystore:
                         type: "PKCS12"
                         location: /opt/cscapi/ejbca/admin-keystore.p12
                         password: password
-
                 signserverAdmin:
                     keystore:
                         type: "PKCS12"
                         location: /opt/cscapi/signserver/admin-keystore.p12
                         password: password
-
                 signserverClient:
                     keystore:
                         type: "PKCS12"
                         location: /opt/cscapi/signserver/client-keystore.p12
                         password: password
 
-
 # Logging configuration
 logging:
     level:
+        # Logging level for the CSC API, allowed values: TRACE, DEBUG, INFO, WARN, ERROR
         com.czertainly.csc: INFO
 
+# Springdoc configuration, DO NOT CHANGE if you are not familiar with Springdoc
 springdoc:
     swagger-ui:
         disable-swagger-default-url: true
