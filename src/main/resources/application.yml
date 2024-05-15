@@ -9,11 +9,11 @@ csc:
     # (e.g. ES for Spain).
     region: CZ
     # SignServer workers configuration file
-    workerConfigurationFile: /opt/cscapi/workers-dev.yml
+    workerConfigurationFile: /opt/cscapi/workers.yml
     # Number of preloaded keys that are stored in memory for faster access
     numberOfPreloadedKeys: 10
     # A filter pattern to identifies keys that can be used for signing in the short term use-case. Use % as a wildcard.
-    keyAliasFilterPattern: pregenerated___%
+    keyAliasFilterPattern: pregenerated%
 
 # IDP configuration
 idp:
@@ -22,6 +22,7 @@ idp:
     # URL of the JWKS endpoint to retrieve and update the public keys
     jwksUri: https://idp.example.com/realms/CSC/protocol/openid-connect/certs
     # URL of the UserInfo endpoint to retrieve user information in exchange for an access token
+    # optional, if not provided, the UserInfo endpoint will not be used
     userInfoUrl: https://idp.example.com/realms/CSC/protocol/openid-connect/userinfo
     # Issuer of the IDP token, used for token validation
     issuer: https://idp.example.com/realms/CSC
@@ -73,10 +74,21 @@ caProvider:
         # End entity configuration
         endEntity:
             # Username pattern to create username
-            # Variables can be used in the pattern, e.g. $[name] will be replaced with the claim value of the name
-            usernamePattern: $[UserInfo.name] $[Credential.id]
+            # You can use placeholders in the patterns, e.g. $[AccessToken.name] will be replaced with the
+            # claim value of the `name` attribute in the access token
+            # The claim values and other placeholder information is taken from:
+            # - the access token that is provided in the Authorization header, in this case the placeholder
+            #   has to be in the form $[AccessToken.<claim>]
+            # - the user info that is retrieved from the IDP UserInfo endpoint, in this case the placeholder
+            #   has to be in the form $[UserInfo.<claim>]
+            # - the Signature Activation Data (SAD) token that is provided in the request body or
+            #   Authorization header, in this case the placeholder has to be in the form $[Sad.<claim>]
+            # - the Credential that is representing the credential of the user, currently only the id is available,
+            #   in this case the placeholder has to be in the form $[Credential.id] and it will be replaced with the
+            #   alias of the key pair that is used for signing
+            usernamePattern: $[UserInfo.name]-$[Credential.id]
             # DN pattern to create subject DN of requested certificate
-            dnPattern: CN=$[UserInfo.name], UID=$[UserInfo.id]
+            dnPattern: CN=$[AccessToken.name], UID=$[UserInfo.id]
             # SAN pattern to create subject alternative name of requested certificate
             sanPattern: None
             # CA name to issue the certificate
