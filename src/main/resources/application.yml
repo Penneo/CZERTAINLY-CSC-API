@@ -70,7 +70,6 @@ caProvider:
         admin:
             # Name of the keystore bundle containing the admin certificate and private key
             keystoreBundle: ejbcaAdmin
-
         # End entity configuration
         endEntity:
             # Username pattern to create username
@@ -87,10 +86,14 @@ caProvider:
             #   in this case the placeholder has to be in the form $[Credential.id] and it will be replaced with the
             #   alias of the key pair that is used for signing
             usernamePattern: $[UserInfo.name]-$[Credential.id]
-            # DN pattern to create subject DN of requested certificate
-            dnPattern: CN=$[AccessToken.name], UID=$[UserInfo.id]
+            # DN pattern to create subject DN of requested certificate.
+            dn:
+                pattern: CN=$[AccessToken.name], UID=$[UserInfo.id]
+                required: CN, UID
             # SAN pattern to create subject alternative name of requested certificate
-            sanPattern: None
+            san:
+                pattern: None
+                required: None
             # CA name to issue the certificate
             caName: DemoClientSubCA_2307RSA
             # End entity profile name to use for the certificate
@@ -134,9 +137,9 @@ spring:
         bundle:
             # Sample configuration of a truststore using PEM encoded certificate or certificate chain
             # pem:
-                # trustedcertificates:
-                #    truststore:
-                #        certificate: /opt/cscapi/trusted-ca-certs.pem
+            # trustedcertificates:
+            #    truststore:
+            #        certificate: /opt/cscapi/trusted-ca-certs.pem
             jks:
                 # Sample configuration of keystore using PKCS12 keystore
                 # ejbcaAdmin: # Name of the keystore bundle
@@ -159,6 +162,24 @@ spring:
                         type: "PKCS12"
                         location: /opt/cscapi/signserver/client-keystore.p12
                         password: password
+    # Datasource configuration
+    datasource:
+        # JDBC URL of the database
+        # for PostgreSQL use: jdbc:postgresql://localhost:5432/cscdb
+        # for MySQL use: jdbc:mysql://localhost:3306/cscdb
+        url: jdbc:postgresql://localhost:5432/cscdb
+        # Username to connect to the database
+        username: 'cscuser'
+        # Password to connect to the database
+        password: 'your-strong-password'
+        # Driver class name of the database
+        # for PostgreSQL use: org.postgresql.Driver
+        # for MySQL use: com.mysql.cj.jdbc.Driver
+        driver-class-name: 'org.postgresql.Driver'
+    flyway:
+        table: "csc_schema_history"
+        schemas: "csc"
+        locations: "classpath:db/migration,classpath:db/specific/{vendor}"
 
 # Logging configuration
 logging:

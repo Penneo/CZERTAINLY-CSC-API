@@ -1,7 +1,7 @@
 package com.czertainly.csc.api.auth;
 
 
-import com.czertainly.csc.controllers.exceptions.BadRequestException;
+import com.czertainly.csc.common.exceptions.InvalidInputDataException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import org.apache.logging.log4j.LogManager;
@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 public class SADParser {
@@ -25,19 +27,20 @@ public class SADParser {
 
     public SignatureActivationData parse(String sad) {
         return validator.validate(sad)
-                        .with(
-                                this::extractSadFromToken,
+                        .mapError(error -> error.extend("Failed to validate SAD"))
+                        .map(this::extractSadFromToken)
+                        .consumeError(
                                 error -> {
-                                    logger.debug("The SAD is not valid. {}", error.description());
-                                    throw new BadRequestException("invalid_request", "The SAD is not valid");
+                                    throw new InvalidInputDataException(error.toString());
                                 }
-                        );
+                        ).unwrap();
     }
 
     private SignatureActivationData extractSadFromToken(Jws<Claims> token) {
         Claims claims = token.getPayload();
         SignatureActivationDataBuilder builder = new SignatureActivationDataBuilder();
-        builder.withCredentialID(claims.get("credentialID", String.class))
+        builder.withUserID(claims.get("userID", String.class))
+               .withCredentialID(claims.get("credentialID", String.class))
                .withSignatureQualifier(claims.get("signatureQualifier", String.class))
                .withHashAlgorithmOID(claims.get("hashAlgorithmOID", String.class))
                .withNumSignatures(Integer.parseInt(claims.get("numSignatures", String.class)))
@@ -68,6 +71,9 @@ public class SADParser {
                 logger.warn("The 'hashes' claim is not a list of strings. The claim will be ignored.");
                 return Set.of();
             }
+        } else if (hashes instanceof String s) {
+            var parts = s.split(",");
+            return Stream.of(parts).map(String::strip).collect(Collectors.toSet());
         } else {
             logger.warn("The 'hashes' claim is not a list. The claim will be ignored.");
             return Set.of();
