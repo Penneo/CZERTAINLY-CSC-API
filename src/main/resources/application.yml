@@ -31,7 +31,7 @@ idp:
     # Clock skew in seconds for token validation
     clockSkewSeconds: 5
     # Name of the truststore bundle containing trusted certificates; OPTIONAL
-    truststoreBundle: trustedcertificates
+    # truststoreBundle: trustedcertificates
     client:
         # Authentication type for the IDP client operations
         # NONE is used for no authentication
