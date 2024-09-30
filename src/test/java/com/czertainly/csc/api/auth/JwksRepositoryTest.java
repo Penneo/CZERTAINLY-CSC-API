@@ -1,6 +1,7 @@
 package com.czertainly.csc.api.auth;
 
 import com.czertainly.csc.api.auth.exceptions.JwkLookupException;
+import com.czertainly.csc.clients.idp.IdpClient;
 import com.czertainly.csc.utils.cert.CertificateUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.when;
 class JwksRepositoryTest {
 
     @Mock
-    private JwksDownloader jwksDownloader;
+    private IdpClient idpClient;
 
     @Spy
     private JwksParser jwksParser = new JwksParser();
@@ -33,7 +34,7 @@ class JwksRepositoryTest {
     JwksRepository jwksRepository;
 
     void mockKeyDownload() {
-        when(jwksDownloader.download()).thenReturn(JWKS_STRING);
+        when(idpClient.downloadJwks()).thenReturn(JWKS_STRING);
     }
 
     @Test
@@ -80,7 +81,7 @@ class JwksRepositoryTest {
         PublicKey key = jwksRepository.getKey(kid, "sig");
 
         // then
-        verify(jwksDownloader).download();
+        verify(idpClient).downloadJwks();
 
     }
 

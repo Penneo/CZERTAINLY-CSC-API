@@ -2,6 +2,7 @@ package com.czertainly.csc.api.auth;
 
 import com.czertainly.csc.api.auth.exceptions.JwkLookupException;
 import com.czertainly.csc.api.auth.exceptions.JwksDownloadException;
+import com.czertainly.csc.clients.idp.IdpClient;
 import io.jsonwebtoken.security.PublicJwk;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -17,16 +18,16 @@ public class JwksRepository {
 
     private static final Logger logger = LogManager.getLogger(JwksRepository.class);
 
-    private final JwksDownloader jwksDownloader;
+    private final IdpClient idpClient;
     private final JwksParser jwksParser;
 
     private final Map<String, PublicKey> signingKeys;
     private final Map<String, PublicKey> encryptionKeys;
 
-    public JwksRepository(JwksDownloader jwksDownloader, JwksParser jwksParser) {
-        assert jwksDownloader != null;
+    public JwksRepository(IdpClient idpClient, JwksParser jwksParser) {
+        assert idpClient != null;
         assert jwksParser != null;
-        this.jwksDownloader = jwksDownloader;
+        this.idpClient = idpClient;
         this.jwksParser = jwksParser;
         this.signingKeys = new java.util.HashMap<>();
         this.encryptionKeys = new java.util.HashMap<>();
@@ -58,7 +59,7 @@ public class JwksRepository {
 
     private void refreshKeys() throws JwksDownloadException {
         logger.debug("Refreshing JWKs.");
-        String jwksString = jwksDownloader.download();
+        String jwksString = idpClient.downloadJwks();
         Set<PublicJwk<?>> keys = jwksParser.parse(jwksString);
         signingKeys.clear();
         encryptionKeys.clear();

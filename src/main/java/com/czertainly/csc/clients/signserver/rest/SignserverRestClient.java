@@ -4,6 +4,7 @@ import com.czertainly.csc.common.exceptions.RemoteSystemException;
 import com.czertainly.csc.configuration.SignApiAuthorization;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
@@ -31,7 +32,7 @@ public class SignserverRestClient {
             @Value("${signingProvider.signserver.client.authType}") SignApiAuthorization authzType,
             @Value("${signingProvider.signserver.client.basic.username}") String basicAuthUsername,
             @Value("${signingProvider.signserver.client.basic.password}") String basicAuthPassword,
-            HttpComponentsClientHttpRequestFactory requestFactory
+            @Qualifier("signserverRequestFactory") HttpComponentsClientHttpRequestFactory requestFactory
     ) {
         log.debug("Creating SignserverRestClient with base URL: {}", signserverUrl);
         restClient = RestClient.builder().requestFactory(requestFactory).baseUrl(signserverUrl).build();

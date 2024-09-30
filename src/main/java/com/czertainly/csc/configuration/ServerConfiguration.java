@@ -116,8 +116,8 @@ public class ServerConfiguration {
         return builder.build();
     }
 
-    @Bean
-    public HttpComponentsClientHttpRequestFactory requestFactory(
+    @Bean("signserverRequestFactory")
+    public HttpComponentsClientHttpRequestFactory signserverRequestFactory(
             @Value("${signingProvider.signserver.client.authType}") SignApiAuthorization authzType,
             @Value("${signingProvider.signserver.client.certificate.keystoreBundle:none}") String keystoreBundleName,
             @Value("${signingProvider.signserver.truststoreBundle:none}") String truststoreBundleName,
@@ -133,6 +133,42 @@ public class ServerConfiguration {
             }
 
             if (authzType == SignApiAuthorization.CERTIFICATE) {
+                if (keystoreBundleName.equals("none") || keystoreBundleName.isBlank()) {
+                    throw new ApplicationConfigurationException(
+                            "Keystore bundle name must be provided when using certificate authorization.");
+                }
+                SslStoreBundle keystoreBundle = sslBundles.getBundle(keystoreBundleName).getStores();
+                KeyStore keystore = keystoreBundle.getKeyStore();
+                builder.loadKeyMaterial(keystore, keystoreBundle.getKeyStorePassword().toCharArray());
+            }
+
+            SSLContext sslContext = builder.build();
+
+            final HttpClient httpClient = getHttpClient(sslContext, null);
+
+            return new HttpComponentsClientHttpRequestFactory(httpClient);
+        } catch (Exception e) {
+            throw new ApplicationConfigurationException("Failed to configure application." + e.getMessage());
+        }
+    }
+
+    @Bean("idpClientRequestFactory")
+    public HttpComponentsClientHttpRequestFactory idpRequestFactory(
+            @Value("${idp.client.authType}") IdpAuthentication authnType,
+            @Value("${idp.client.certificate.keystoreBundle:none}") String keystoreBundleName,
+            @Value("${idp.truststoreBundle:none}") String truststoreBundleName,
+            SslBundles sslBundles
+    ) throws ApplicationConfigurationException {
+        try {
+            SSLContextBuilder builder = SSLContexts.custom();
+
+            if (!truststoreBundleName.equals("none") && !truststoreBundleName.isBlank()) {
+                SslBundle truststoreBundle = sslBundles.getBundle(truststoreBundleName);
+                KeyStore truststore = truststoreBundle.getStores().getTrustStore();
+                builder.loadTrustMaterial(truststore, null);
+            }
+
+            if (authnType == IdpAuthentication.CERTIFICATE) {
                 if (keystoreBundleName.equals("none") || keystoreBundleName.isBlank()) {
                     throw new ApplicationConfigurationException(
                             "Keystore bundle name must be provided when using certificate authorization.");

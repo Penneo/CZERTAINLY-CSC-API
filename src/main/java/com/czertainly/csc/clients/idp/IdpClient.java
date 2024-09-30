@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -22,23 +23,28 @@ public class IdpClient {
 
 
     private static final Logger logger = LoggerFactory.getLogger(IdpClient.class);
-    RestClient restClient;
-    boolean canDownloadUserInfo;
-
+    private final RestClient restClient;
+    private final boolean canDownloadUserInfo;
+    private final String jwksUri;
+    private final String userInfoUri;
 
     public IdpClient(@Value("${idp.userInfoUrl:none}") String userInfoUrl,
-                     HttpComponentsClientHttpRequestFactory requestFactory
+                     @Value("${idp.jwksUri}") String jwksUri,
+                     @Qualifier("idpClientRequestFactory") HttpComponentsClientHttpRequestFactory requestFactory
     ) {
         canDownloadUserInfo = userInfoUrl != null && !userInfoUrl.equals("none");
+        this.userInfoUri = userInfoUrl;
+        this.jwksUri = jwksUri;
+
+        this.restClient = RestClient.builder()
+                                    .requestFactory(requestFactory)
+                                    .build();
+
         if (!canDownloadUserInfo) {
             logger.info("Application is not configured to download user info.");
-            return;
         }
-        restClient = RestClient.builder()
-                               .requestFactory(requestFactory)
-                               .baseUrl(userInfoUrl)
-                               .build();
     }
+
 
     public UserInfo downloadUserInfo(String token) {
         if (!canDownloadUserInfo) {
@@ -47,6 +53,7 @@ public class IdpClient {
         logger.debug("Downloading user info from IDP.");
         logger.trace("Using token '{}' to download the user info.", token);
         ResponseEntity<String> response = restClient.get()
+                                                    .uri(this.userInfoUri)
                                                     .header("Authorization", "Bearer " + token)
                                                     .accept(MediaType.APPLICATION_JSON)
                                                     .retrieve()
@@ -64,6 +71,16 @@ public class IdpClient {
         } catch (JsonProcessingException e) {
             throw new RemoteSystemException("Failed to parse response from IDP into a JSON object.", e);
         }
+    }
+
+    public String downloadJwks() {
+        logger.debug("Downloading JWKS from the IDP.");
+
+        return restClient.get()
+                         .uri(this.jwksUri)
+                         .accept(MediaType.APPLICATION_JSON)
+                         .retrieve()
+                         .body(String.class);
     }
 
 

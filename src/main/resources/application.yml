@@ -30,6 +30,16 @@ idp:
     audience: cscapi
     # Clock skew in seconds for token validation
     clockSkewSeconds: 5
+    # Name of the truststore bundle containing trusted certificates; OPTIONAL
+    truststoreBundle: trustedcertificates
+    client:
+        # Authentication type for the IDP client operations
+        # NONE is used for no authentication
+        # CERTIFICATE is used for mutual TLS authentication and requires a client certificate
+        authType: NONE
+        # Only used when authorization type is CERTIFICATE
+        certificate:
+            keystoreBundle: idpClient
 
 # Signing provider configuration
 signingProvider:
@@ -147,6 +157,11 @@ spring:
                 #         type: "PKCS12" # Keystore type, allowed values: JKS, PKCS12
                 #         location: /opt/cscapi/admin-keystore.p12 # Absolute path to the keystore file
                 #         password: password # Keystore password
+                idpClient:
+                    keystore:
+                        type: "PKCS12"
+                        location: /opt/cscapi/idp/client-keystore.p12
+                        password: password
                 ejbcaAdmin:
                     keystore:
                         type: "PKCS12"
