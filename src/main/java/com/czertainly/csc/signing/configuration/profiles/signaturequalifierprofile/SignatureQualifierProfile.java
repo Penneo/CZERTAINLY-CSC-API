@@ -11,19 +11,23 @@ public class SignatureQualifierProfile extends Profile {
     private final UsernameProvider usernameProvider;
     private final DistinguishedNameProvider distinguishedNameProvider;
     private final SubjectAlternativeNameProvider subjectAlternativeNameProvider;
+    private final int multisign;
 
     public SignatureQualifierProfile(String name, String certificateAuthority, String certificateProfileName,
                                      String endEntityProfileName, Duration certificateValidity,
-                                     Duration certificateValidityOffset, UsernameProvider usernameProvider,
+                                     Duration certificateValidityOffset, String csrSignatureAlgorithm,
+                                     UsernameProvider usernameProvider,
                                      DistinguishedNameProvider distinguishedNameProvider,
-                                     SubjectAlternativeNameProvider subjectAlternativeNameProvider
+                                     SubjectAlternativeNameProvider subjectAlternativeNameProvider,
+                                     int multisign
     ) {
         super(name, certificateAuthority, certificateProfileName, endEntityProfileName, certificateValidity,
-              certificateValidityOffset
+              certificateValidityOffset, csrSignatureAlgorithm
         );
         this.usernameProvider = usernameProvider;
         this.distinguishedNameProvider = distinguishedNameProvider;
         this.subjectAlternativeNameProvider = subjectAlternativeNameProvider;
+        this.multisign = multisign;
     }
 
     public UsernameProvider getUsernameProvider() {
@@ -36,5 +40,9 @@ public class SignatureQualifierProfile extends Profile {
 
     public SubjectAlternativeNameProvider getSubjectAlternativeNameProvider() {
         return subjectAlternativeNameProvider;
+    }
+
+    public int getMultisign() {
+        return multisign;
     }
 }

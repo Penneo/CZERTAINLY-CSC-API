@@ -3,21 +3,20 @@ package com.czertainly.csc.configuration;
 import com.czertainly.csc.api.auth.authn.CscJwtAuthenticationConverter;
 import com.czertainly.csc.clients.ejbca.ws.EjbcaWsClient;
 import com.czertainly.csc.clients.signserver.ws.SignserverWsClient;
-import com.czertainly.csc.common.PatternReplacer;
 import com.czertainly.csc.common.exceptions.ApplicationConfigurationException;
+import com.czertainly.csc.configuration.idp.IdpAuthentication;
+import com.czertainly.csc.configuration.idp.IdpConfiguration;
 import com.czertainly.csc.signing.configuration.WorkerRepository;
 import com.czertainly.csc.signing.configuration.WorkerWithCapabilities;
 import com.czertainly.csc.signing.configuration.loader.WorkerConfigurationLoader;
 import org.apache.hc.client5.http.classic.HttpClient;
 import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
-import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManager;
-import org.apache.hc.client5.http.socket.ConnectionSocketFactory;
-import org.apache.hc.client5.http.socket.PlainConnectionSocketFactory;
-import org.apache.hc.client5.http.ssl.DefaultHostnameVerifier;
-import org.apache.hc.client5.http.ssl.SSLConnectionSocketFactory;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
+import org.apache.hc.client5.http.ssl.TlsSocketStrategy;
 import org.apache.hc.core5.http.HttpRequestInterceptor;
-import org.apache.hc.core5.http.config.RegistryBuilder;
+import org.apache.hc.core5.http.io.SocketConfig;
 import org.apache.hc.core5.ssl.SSLContextBuilder;
 import org.apache.hc.core5.ssl.SSLContexts;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -27,8 +26,7 @@ import org.springframework.boot.ssl.SslBundles;
 import org.springframework.boot.ssl.SslStoreBundle;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.convert.ConversionService;
-import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.context.annotation.PropertySource;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -42,12 +40,14 @@ import org.springframework.ws.transport.http.HttpComponents5MessageSender;
 import javax.net.ssl.SSLContext;
 import java.security.*;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@PropertySource(value = "file:${csc.profilesConfigurationDirectory}/key-pool-profiles.yml", factory = MultipleYamlPropertySourceFactory.class)
 public class ServerConfiguration {
 
     @Bean
@@ -97,25 +97,6 @@ public class ServerConfiguration {
         return marshaller;
     }
 
-    private static HttpClient getHttpClient(SSLContext sslContext, HttpRequestInterceptor interceptor) {
-        final var sslsf = new SSLConnectionSocketFactory(sslContext, new DefaultHostnameVerifier());
-
-        final var socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
-                                                         .register("https", sslsf)
-                                                         .build();
-
-        final var connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
-
-        HttpClientBuilder builder = HttpClients.custom()
-                                               .setConnectionManager(connectionManager);
-
-        if (interceptor != null) {
-            builder.addRequestInterceptorFirst(interceptor);
-        }
-
-        return builder.build();
-    }
-
     @Bean("signserverRequestFactory")
     public HttpComponentsClientHttpRequestFactory signserverRequestFactory(
             @Value("${signingProvider.signserver.client.authType}") SignApiAuthorization authzType,
@@ -154,26 +135,22 @@ public class ServerConfiguration {
 
     @Bean("idpClientRequestFactory")
     public HttpComponentsClientHttpRequestFactory idpRequestFactory(
-            @Value("${idp.client.authType}") IdpAuthentication authnType,
-            @Value("${idp.client.certificate.keystoreBundle:none}") String keystoreBundleName,
-            @Value("${idp.truststoreBundle:none}") String truststoreBundleName,
+            IdpConfiguration idpConfiguration,
             SslBundles sslBundles
     ) throws ApplicationConfigurationException {
         try {
             SSLContextBuilder builder = SSLContexts.custom();
 
-            if (!truststoreBundleName.equals("none") && !truststoreBundleName.isBlank()) {
-                SslBundle truststoreBundle = sslBundles.getBundle(truststoreBundleName);
+            if (idpConfiguration.truststoreBundle() != null && !idpConfiguration.truststoreBundle().isBlank()) {
+                SslBundle truststoreBundle = sslBundles.getBundle(idpConfiguration.truststoreBundle());
                 KeyStore truststore = truststoreBundle.getStores().getTrustStore();
                 builder.loadTrustMaterial(truststore, null);
             }
 
-            if (authnType == IdpAuthentication.CERTIFICATE) {
-                if (keystoreBundleName.equals("none") || keystoreBundleName.isBlank()) {
-                    throw new ApplicationConfigurationException(
-                            "Keystore bundle name must be provided when using certificate authorization.");
-                }
-                SslStoreBundle keystoreBundle = sslBundles.getBundle(keystoreBundleName).getStores();
+            if (idpConfiguration.client().authType() == IdpAuthentication.CERTIFICATE) {
+                SslStoreBundle keystoreBundle = sslBundles.getBundle(
+                        idpConfiguration.client().certificate().keystoreBundle()
+                ).getStores();
                 KeyStore keystore = keystoreBundle.getKeyStore();
                 builder.loadKeyMaterial(keystore, keystoreBundle.getKeyStorePassword().toCharArray());
             }
@@ -208,6 +185,18 @@ public class ServerConfiguration {
         return new WorkerRepository(workers);
     }
 
+    @Bean
+    public SignserverWsClient signserverWSClient(@Qualifier("signserverWsMarshaller") Jaxb2Marshaller marshaller,
+                                                 @Qualifier("signserverMessageSender") HttpComponents5MessageSender httpComponentsMessageSender,
+                                                 @Value("${signingProvider.signserver.url}") String signserverUrl
+    ) {
+        SignserverWsClient client = new SignserverWsClient(signserverUrl);
+        client.setMarshaller(marshaller);
+        client.setUnmarshaller(marshaller);
+        client.setMessageSender(httpComponentsMessageSender);
+        return client;
+    }
+
     private HttpComponents5MessageSender getHttpComponentsMessageSender(
             String keystoreBundleName,
             String truststoreBundleName,
@@ -240,46 +229,20 @@ public class ServerConfiguration {
         }
     }
 
-    @Bean
-    public SignserverWsClient signserverWSClient(@Qualifier("signserverWsMarshaller") Jaxb2Marshaller marshaller,
-                                                 @Qualifier("signserverMessageSender") HttpComponents5MessageSender httpComponentsMessageSender,
-                                                 @Value("${signingProvider.signserver.url}") String signserverUrl
-    ) {
-        SignserverWsClient client = new SignserverWsClient(signserverUrl);
-        client.setMarshaller(marshaller);
-        client.setUnmarshaller(marshaller);
-        client.setMessageSender(httpComponentsMessageSender);
-        return client;
-    }
+    private static HttpClient getHttpClient(SSLContext sslContext, HttpRequestInterceptor interceptor) {
+        TlsSocketStrategy tlsSocketStrategy = new DefaultClientTlsStrategy(sslContext);
+        SocketConfig socketConfig = SocketConfig.custom().setSoTimeout(10, TimeUnit.SECONDS).build();
+        final var connectionManager = PoolingHttpClientConnectionManagerBuilder.create()
+                                                                               .setDefaultSocketConfig(socketConfig)
+                                                                               .setTlsSocketStrategy(tlsSocketStrategy)
+                                                                               .build();
 
-    @Bean
-    public HttpClient getHttpClient(
-            @Value("${signingProvider.signserver.truststoreBundle:none}") String truststoreBundleName,
-            SslBundles sslBundles
-    ) throws NoSuchAlgorithmException, KeyStoreException, KeyManagementException {
+        HttpClientBuilder builder = HttpClients.custom().setConnectionManager(connectionManager);
 
-        SSLContextBuilder builder = SSLContexts.custom();
-
-        if (!truststoreBundleName.equals("none") && !truststoreBundleName.isBlank()) {
-            SslBundle truststoreBundle = sslBundles.getBundle(truststoreBundleName);
-            KeyStore truststore = truststoreBundle.getStores().getTrustStore();
-            builder.loadTrustMaterial(truststore, null);
+        if (interceptor != null) {
+            builder.addRequestInterceptorFirst(interceptor);
         }
 
-        SSLContext sslContext = builder.build();
-
-        final var sslsf = new SSLConnectionSocketFactory(sslContext, new DefaultHostnameVerifier());
-
-        final var socketFactoryRegistry = RegistryBuilder.<ConnectionSocketFactory>create()
-                                                         .register("https", sslsf)
-                                                         .register("http", new PlainConnectionSocketFactory())
-                                                         .build();
-
-        final var connectionManager = new PoolingHttpClientConnectionManager(socketFactoryRegistry);
-
-        HttpClientBuilder httpBuilder = HttpClients.custom()
-                                                   .setConnectionManager(connectionManager);
-
-        return httpBuilder.build();
+        return builder.build();
     }
 }
