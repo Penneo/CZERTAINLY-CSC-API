@@ -27,6 +27,16 @@ csc:
         # Run cleanup of expired sessions according to the specified cron expression
         # The cron expression is in the UN*X definition format: second, minute, hour, day of month, month, and day of week
         cleanupCronExpression: "0 0 * * * *"
+    # Configuration of the one-time keys
+    # One-time keys are pre-generated keys used for signing only once
+    # The keys are generated in pools
+    oneTimeKeys:
+        # How long will the keys be kept in the pool in ISO 8601 duration format before they are removed
+        # See https://en.wikipedia.org/wiki/ISO_8601#Durations for more information
+        usedUpKeyKeepTime: PT1H
+        # How often will the cleaning of the used-up keys be performed according to the specified cron expression
+        # The cron expression is in the UN*X definition format: second, minute, hour, day of month, month, and day of week
+        cleanupCronExpression: "0 0 * * * *"
 
 # IDP configuration
 idp:
