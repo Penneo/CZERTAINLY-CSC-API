@@ -188,6 +188,9 @@ spring:
         table: "csc_schema_history"
         schemas: "csc"
         locations: "classpath:db/migration,classpath:db/specific/{vendor}"
+    threads:
+        virtual:
+            enabled: true
 
 # Logging configuration
 logging:
