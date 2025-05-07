@@ -5,37 +5,47 @@ import com.czertainly.csc.configuration.keypools.KeyUsageDesignation;
 import com.czertainly.csc.model.signserver.CryptoToken;
 import com.czertainly.csc.service.keys.*;
 import com.czertainly.csc.signing.configuration.WorkerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Component
+@Profile("keys-generator")
 public class KeyPoolReplenishTrigger {
+
+    @Autowired
+    @Qualifier("keyGenerationExecutor")
+    private ExecutorService keyGenerationExecutor;
 
     private final KeyPoolReplenisher<SessionKey> sessionKeyPoolReplenisher;
     private final KeyPoolReplenisher<OneTimeKey> oneTimeKeyPoolReplenisher;
 
-    public KeyPoolReplenishTrigger(WorkerRepository repository, SessionKeysService sessionKeysService, OneTimeKeysService oneTimeKeysService) {
+    public KeyPoolReplenishTrigger(WorkerRepository repository, SessionKeysService sessionKeysService,
+                                   OneTimeKeysService oneTimeKeysService) {
 
         List<CryptoToken> cryptoTokensForSessionSignatures = getCryptoTokensWithDesignatedUsage(
                 repository, KeyUsageDesignation.SESSION_SIGNATURE
         );
-        sessionKeyPoolReplenisher = new KeyPoolReplenisher<>(cryptoTokensForSessionSignatures, sessionKeysService);
+        sessionKeyPoolReplenisher = new KeyPoolReplenisher<>(cryptoTokensForSessionSignatures, sessionKeysService, keyGenerationExecutor);
 
         List<CryptoToken> cryptoTokensForOneTimeSignatures = getCryptoTokensWithDesignatedUsage(
                 repository, KeyUsageDesignation.ONE_TIME_SIGNATURE
         );
-        oneTimeKeyPoolReplenisher = new KeyPoolReplenisher<>(cryptoTokensForOneTimeSignatures, oneTimeKeysService);
+        oneTimeKeyPoolReplenisher = new KeyPoolReplenisher<>(cryptoTokensForOneTimeSignatures, oneTimeKeysService, keyGenerationExecutor);
     }
 
-    @Scheduled(fixedDelay = 60, timeUnit = TimeUnit.SECONDS, initialDelay = 0)
+    @Scheduled(cron = "${csc.signingSessions.generateCronExpression}")
     public void replenishSessionPools() {
         sessionKeyPoolReplenisher.replenishPools();
     }
 
-    @Scheduled(fixedDelay = 60, timeUnit = TimeUnit.SECONDS, initialDelay = 5)
+    @Scheduled(cron = "${csc.oneTimeKeys.generateCronExpression}")
     public void replenishOneTimePools() {
         oneTimeKeyPoolReplenisher.replenishPools();
     }
