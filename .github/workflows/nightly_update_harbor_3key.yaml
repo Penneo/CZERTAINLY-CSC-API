@@ -38,6 +38,9 @@ jobs:
           MAJOR=${FULL%%.*}
           MINOR=${FULL%.*}
           echo "tags=${FULL},${MINOR},${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "major=${MAJOR}" >> "$GITHUB_OUTPUT"
+          echo "minor=${MINOR}" >> "$GITHUB_OUTPUT"
+          echo "full=${VER}" >> "$GITHUB_OUTPUT"
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -61,8 +64,8 @@ jobs:
           tags: |
             type=schedule,pattern=nightly
             type=raw,value=latest
-            type=raw,value=${{ steps.version.outputs.minor }}
-            type=raw,value=${{ steps.version.outputs.major }}
+            type=raw,value=${{ steps.semver.outputs.minor }}
+            type=raw,value=${{ steps.semver.outputs.major }}
             type=schedule,pattern={{date 'YYYYMMDD'}},priority=900
             type=sha
 
