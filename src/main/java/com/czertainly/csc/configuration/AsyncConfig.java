@@ -1,8 +1,10 @@
 package com.czertainly.csc.configuration;
 
+import com.czertainly.csc.configuration.csc.CscConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableAsync;
@@ -14,9 +16,16 @@ import java.util.concurrent.ThreadFactory;
 
 @Configuration
 @EnableAsync
+@EnableConfigurationProperties(CscConfiguration.class)
 public class AsyncConfig {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncConfig.class);
+
+    private final CscConfiguration cscConfig;
+
+    public AsyncConfig(CscConfiguration cscConfig) {
+        this.cscConfig = cscConfig;
+    }
 
     @Bean(name = "oneTimeKeyDeletionExecutor", destroyMethod = "close")
     public ExecutorService oneTimeKeyDeletionExecutor() {
@@ -26,7 +35,7 @@ public class AsyncConfig {
                         (t, e) -> logger.error("Uncaught exception in one-time key deletion thread: {}",
                                 t.getName(), e))
                 .factory();
-        ExecutorService base = Executors.newThreadPerTaskExecutor(tf);
+        ExecutorService base = Executors.newFixedThreadPool(cscConfig.concurrency().maxKeyDeletion(), tf);
         return new DelegatingSecurityContextExecutorService(base);
     }
 
@@ -38,7 +47,7 @@ public class AsyncConfig {
                         (t, e) -> logger.error("Uncaught exception in key generation thread: {}",
                                 t.getName(), e))
                 .factory();
-        ExecutorService base = Executors.newThreadPerTaskExecutor(tf);
+        ExecutorService base = Executors.newFixedThreadPool(cscConfig.concurrency().maxKeyGeneration(), tf);
         return new DelegatingSecurityContextExecutorService(base);
     }
 
