@@ -11,14 +11,12 @@ jobs:
   push_to_registry:
     name: Push Docker images
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-      packages: read
-      security-events: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.1
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -30,8 +28,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: harbor.3key.company
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
+          username: ${{ secrets.HARBOR_3KEY_USERNAME }}
+          password: ${{ secrets.HARBOR_3KEY_PASSWORD }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -47,6 +45,46 @@ jobs:
             type=raw,value=develop-latest
             type=sha,prefix=develop-,format=long
 
+      - name: Test build Docker image
+        id: build-and-load
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          file: ./Dockerfile
+          # Build only the host architecture for the pre-scan build;
+          # --load works only when a single platform is produced.
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Select tag for scanning
+        id: tag
+        run: |
+          FIRST_TAG="$(echo "${{ steps.meta.outputs.tags }}" | head -n 1)"
+          echo "value=$FIRST_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ steps.tag.outputs.value }}
+          format: json
+          output: trivy-report.json
+          exit-code: 0
+
+      - name: Upload vulnerability report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+
+      - name: Fail build on vulnerabilities
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ steps.tag.outputs.value }}
+          trivy-config: config/trivy.yaml
+          skip-setup-trivy: true
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         id: build-and-push
@@ -60,11 +98,24 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Push README to 3Key Harbor
-        uses: christian-korneck/update-container-description-action@cf2977b0f3d189227f140ecbc6402c5a042b34e4
+      - name: Sign images with a key
+        run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes --key env://COSIGN_PRIVATE_KEY ${images}
         env:
-          DOCKER_USER: ${{ secrets.HARBOR_USERNAME }}
-          DOCKER_PASS: ${{ secrets.HARBOR_PASSWORD }}
+          TAGS: ${{ steps.meta.outputs.tags }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+          DIGEST: ${{ steps.build-and-push.outputs.digest }}
+
+      - name: Push README to 3Key Harbor
+        uses: christian-korneck/update-container-description-action@v1
+        env:
+          DOCKER_USER: ${{ secrets.HARBOR_3KEY_USERNAME }}
+          DOCKER_PASS: ${{ secrets.HARBOR_3KEY_PASSWORD }}
         with:
           destination_container_repo: harbor.3key.company/czertainly-signing/czertainly-csc-api
           provider: harbor2
