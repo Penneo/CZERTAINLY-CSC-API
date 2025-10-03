@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Allows to generate new signing keys on Signserver and stores them in database.
@@ -26,6 +27,9 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
     protected final KeyRepository<E> keysRepository;
     private final SignserverClient signserverClient;
     protected final WorkerRepository workerRepository;
+    
+    // Lock objects per crypto token ID to ensure proper synchronization across different CryptoToken instances
+    private static final ConcurrentHashMap<Integer, Object> cryptoTokenLocks = new ConcurrentHashMap<>();
 
 
     public AbstractSigningKeysService(KeyRepository<E> keysRepository, SignserverClient signserverClient,
@@ -93,7 +97,12 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
         logger.debug("Acquiring a signing key of CryptoToken '{}' with algorithm '{}'",
                      cryptoToken.identifier(), keyAlgorithm
         );
-        synchronized (cryptoToken) {
+        // Get or create a lock object for this specific crypto token ID
+        // This ensures all threads trying to acquire keys for the same crypto token
+        // will synchronize on the same lock object, even if they have different CryptoToken instances
+        Object lock = cryptoTokenLocks.computeIfAbsent(cryptoToken.id(), id -> new Object());
+        
+        synchronized (lock) {
             return keysRepository.findFirstByCryptoTokenIdAndKeyAlgorithmAndInUse(
                                          cryptoToken.id(), keyAlgorithm, false
                                  )
