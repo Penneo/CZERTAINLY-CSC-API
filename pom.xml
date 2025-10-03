@@ -14,7 +14,6 @@
     <name>SignServer-CSC-API</name>
     <description>CSC API for Signserver</description>
     <properties>
-        <sonar.projectKey>3KeyCompany_SignServer-CSC-API</sonar.projectKey>
         <java.version>21</java.version>
 
         <version.bc>1.81</version.bc>
@@ -29,6 +28,10 @@
         <version.testcontainers.keycloak>3.7.0</version.testcontainers.keycloak>
 
         <version.springdoc-openapi-maven-plugin>1.5</version.springdoc-openapi-maven-plugin>
+
+        <sonar.organization>czertainly</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.projectKey>CZERTAINLY_CZERTAINLY-CSC-API</sonar.projectKey>
     </properties>
     
     <dependencies>
