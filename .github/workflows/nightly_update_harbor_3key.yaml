@@ -20,6 +20,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.1
+
       - name: Get latest tag
         id: latest
         run: |
