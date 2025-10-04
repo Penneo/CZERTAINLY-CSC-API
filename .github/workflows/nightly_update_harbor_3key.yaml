@@ -52,8 +52,8 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: harbor.3key.company
-          username: ${{ secrets.HARBOR_USERNAME }}
-          password: ${{ secrets.HARBOR_PASSWORD }}
+          username: ${{ secrets.HARBOR_3KEY_USERNAME }}
+          password: ${{ secrets.HARBOR_3KEY_PASSWORD }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
