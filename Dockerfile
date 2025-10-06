@@ -26,7 +26,7 @@ RUN jdeps \
 
 # Create a custom Java runtime
 RUN $JAVA_HOME/bin/jlink \
-  --add-modules $(cat modules.txt),jdk.crypto.ec \
+  --add-modules $(cat modules.txt),jdk.crypto.ec,jdk.management,jdk.management.agent \
   --strip-debug \
   --no-man-pages \
   --no-header-files \
