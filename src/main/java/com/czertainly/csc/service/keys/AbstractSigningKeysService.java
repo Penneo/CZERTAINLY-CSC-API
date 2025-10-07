@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Allows to generate new signing keys on Signserver and stores them in database.
@@ -26,6 +28,9 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
     protected final KeyRepository<E> keysRepository;
     private final SignserverClient signserverClient;
     protected final WorkerRepository workerRepository;
+
+    // ReentrantLock per crypto token ID to prevent duplicate key generation while allowing virtual threads to unmount
+    private static final ConcurrentHashMap<Integer, ReentrantLock> cryptoTokenLocks = new ConcurrentHashMap<>();
 
 
     public AbstractSigningKeysService(KeyRepository<E> keysRepository, SignserverClient signserverClient,
@@ -93,33 +98,39 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
         logger.debug("Acquiring a signing key of CryptoToken '{}' with algorithm '{}'",
                      cryptoToken.identifier(), keyAlgorithm
         );
-        // Concurrency is handled by @Lock(LockModeType.PESSIMISTIC_WRITE) on the repository method
-        // No application-level synchronization needed
-        return keysRepository.findFirstByCryptoTokenIdAndKeyAlgorithmAndInUse(
-                                     cryptoToken.id(), keyAlgorithm, false
-                             )
-                             .map(entity -> {
-                                 entity.setAcquiredAt(ZonedDateTime.now());
-                                 entity.setInUse(true);
-                                 return keysRepository.save(entity);
-                             })
-                             .map(keyEntity -> this.mapEntityToSigningKey(keyEntity, cryptoToken))
-                             .map(Result::<K, TextError>success)
-                             // If no key is found, try to generate a new one
-                             .orElseGet(() -> generateKey(cryptoToken, keyAlgorithm)
-                                     .flatMap(k -> {
-                                             keysRepository.findById(k.id()).ifPresent(e -> {
-                                                 e.setAcquiredAt(ZonedDateTime.now());
-                                                 e.setInUse(true);
-                                                 keysRepository.save(e);
-                                             });
-                                         return Result.success(k);
-                                     })
-                                     .mapError(e -> e.extend(
-                                             "New key couldn't be acquired from CryptoToken '%s'.",
-                                             cryptoToken.identifier()
-                                     ))
-                             );
+        // Use ReentrantLock instead of synchronized to allow virtual threads to unmount during blocking I/O
+        ReentrantLock lock = cryptoTokenLocks.computeIfAbsent(cryptoToken.id(), id -> new ReentrantLock());
+
+        lock.lock();
+        try {
+            return keysRepository.findFirstByCryptoTokenIdAndKeyAlgorithmAndInUse(
+                                         cryptoToken.id(), keyAlgorithm, false
+                                 )
+                                 .map(entity -> {
+                                     entity.setAcquiredAt(ZonedDateTime.now());
+                                     entity.setInUse(true);
+                                     return keysRepository.save(entity);
+                                 })
+                                 .map(keyEntity -> this.mapEntityToSigningKey(keyEntity, cryptoToken))
+                                 .map(Result::<K, TextError>success)
+                                 // If no key is found, try to generate a new one
+                                 .orElseGet(() -> generateKey(cryptoToken, keyAlgorithm)
+                                         .flatMap(k -> {
+                                                 keysRepository.findById(k.id()).ifPresent(e -> {
+                                                     e.setAcquiredAt(ZonedDateTime.now());
+                                                     e.setInUse(true);
+                                                     keysRepository.save(e);
+                                                 });
+                                             return Result.success(k);
+                                         })
+                                         .mapError(e -> e.extend(
+                                                 "New key couldn't be acquired from CryptoToken '%s'.",
+                                                 cryptoToken.identifier()
+                                         ))
+                                 );
+        } finally {
+            lock.unlock();
+        }
     }
 
     public Result<K, TextError> getKey(UUID keyId) {
