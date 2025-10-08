@@ -8,7 +8,8 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConfigurationProperties(prefix = "http.client")
-public class HttpClientProperties {
+public class HttpClientProperties
+{
 
     /**
      * Maximum total connections in the connection pool.
@@ -23,11 +24,11 @@ public class HttpClientProperties {
     private int defaultMaxPerRoute = 20;
 
     /**
-     * Connection timeout in seconds.
+     * Connection request timeout in seconds.
      * Time to wait for a connection from the connection pool.
      * Default: 10 seconds
      */
-    private int connectionTimeoutSeconds = 10;
+    private int connectionRequestTimeoutSeconds = 10;
 
     /**
      * Socket read timeout in seconds.
@@ -43,35 +44,43 @@ public class HttpClientProperties {
      */
     private int responseTimeoutSeconds = 30;
 
-    public int getMaxTotal() {
+    public int getMaxTotal()
+    {
         return maxTotal;
     }
 
-    public void setMaxTotal(int maxTotal) {
+    public void setMaxTotal(int maxTotal)
+    {
         this.maxTotal = maxTotal;
     }
 
-    public int getDefaultMaxPerRoute() {
+    public int getDefaultMaxPerRoute()
+    {
         return defaultMaxPerRoute;
     }
 
-    public void setDefaultMaxPerRoute(int defaultMaxPerRoute) {
+    public void setDefaultMaxPerRoute(int defaultMaxPerRoute)
+    {
         this.defaultMaxPerRoute = defaultMaxPerRoute;
     }
 
-    public int getConnectionTimeoutSeconds() {
-        return connectionTimeoutSeconds;
+    public int getConnectionRequestTimeoutSeconds()
+    {
+        return connectionRequestTimeoutSeconds;
     }
 
-    public void setConnectionTimeoutSeconds(int connectionTimeoutSeconds) {
-        this.connectionTimeoutSeconds = connectionTimeoutSeconds;
+    public void setConnectionRequestTimeoutSeconds(int connectionRequestTimeoutSeconds)
+    {
+        this.connectionRequestTimeoutSeconds = connectionRequestTimeoutSeconds;
     }
 
-    public int getReadTimeoutSeconds() {
+    public int getReadTimeoutSeconds()
+    {
         return readTimeoutSeconds;
     }
 
-    public void setReadTimeoutSeconds(int readTimeoutSeconds) {
+    public void setReadTimeoutSeconds(int readTimeoutSeconds)
+    {
         this.readTimeoutSeconds = readTimeoutSeconds;
     }
 

@@ -38,7 +38,6 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.ws.transport.http.HttpComponents5ClientFactory;
-import org.springframework.ws.transport.http.HttpComponents5MessageSender;
 import org.springframework.ws.transport.http.SimpleHttpComponents5MessageSender;
 
 import javax.net.ssl.SSLContext;
@@ -252,7 +251,7 @@ public class ServerConfiguration {
                                                                                .build();
 
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectionRequestTimeout(Timeout.ofSeconds(properties.getConnectionTimeoutSeconds()))
+                .setConnectionRequestTimeout(Timeout.ofSeconds(properties.getConnectionRequestTimeoutSeconds()))
                 .setResponseTimeout(Timeout.ofSeconds(properties.getResponseTimeoutSeconds()))
                 .build();
 
