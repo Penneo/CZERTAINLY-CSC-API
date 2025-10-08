@@ -10,11 +10,13 @@ import com.czertainly.csc.signing.configuration.WorkerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Allows to generate new signing keys on Signserver and stores them in database.
@@ -27,17 +29,19 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
     protected final KeyRepository<E> keysRepository;
     private final SignserverClient signserverClient;
     protected final WorkerRepository workerRepository;
-    
-    // Lock objects per crypto token ID to ensure proper synchronization across different CryptoToken instances
-    private static final ConcurrentHashMap<Integer, Object> cryptoTokenLocks = new ConcurrentHashMap<>();
+    private final TransactionTemplate transactionTemplate;
+
+    // ReentrantLock per crypto token ID to prevent duplicate key generation while allowing virtual threads to unmount
+    private static final ConcurrentHashMap<Integer, ReentrantLock> cryptoTokenLocks = new ConcurrentHashMap<>();
 
 
     public AbstractSigningKeysService(KeyRepository<E> keysRepository, SignserverClient signserverClient,
-                                      WorkerRepository workerRepository
+                                      WorkerRepository workerRepository, TransactionTemplate transactionTemplate
     ) {
         this.keysRepository = keysRepository;
         this.signserverClient = signserverClient;
         this.workerRepository = workerRepository;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Override
@@ -97,37 +101,55 @@ public abstract class AbstractSigningKeysService<E extends KeyEntity, K extends 
         logger.debug("Acquiring a signing key of CryptoToken '{}' with algorithm '{}'",
                      cryptoToken.identifier(), keyAlgorithm
         );
-        // Get or create a lock object for this specific crypto token ID
-        // This ensures all threads trying to acquire keys for the same crypto token
-        // will synchronize on the same lock object, even if they have different CryptoToken instances
-        Object lock = cryptoTokenLocks.computeIfAbsent(cryptoToken.id(), id -> new Object());
-        
-        synchronized (lock) {
-            return keysRepository.findFirstByCryptoTokenIdAndKeyAlgorithmAndInUse(
-                                         cryptoToken.id(), keyAlgorithm, false
-                                 )
-                                 .map(entity -> {
-                                     entity.setAcquiredAt(ZonedDateTime.now());
-                                     entity.setInUse(true);
-                                     return keysRepository.save(entity);
-                                 })
-                                 .map(keyEntity -> this.mapEntityToSigningKey(keyEntity, cryptoToken))
-                                 .map(Result::<K, TextError>success)
-                                 // If no key is found, try to generate a new one
-                                 .orElseGet(() -> generateKey(cryptoToken, keyAlgorithm)
-                                         .flatMap(k -> {
-                                                 keysRepository.findById(k.id()).ifPresent(e -> {
-                                                     e.setAcquiredAt(ZonedDateTime.now());
-                                                     e.setInUse(true);
-                                                     keysRepository.save(e);
-                                                 });
-                                             return Result.success(k);
-                                         })
-                                         .mapError(e -> e.extend(
-                                                 "New key couldn't be acquired from CryptoToken '%s'.",
-                                                 cryptoToken.identifier()
-                                         ))
-                                 );
+        // Use ReentrantLock instead of synchronized to allow virtual threads to unmount during blocking I/O
+        ReentrantLock lock = cryptoTokenLocks.computeIfAbsent(cryptoToken.id(), id -> new ReentrantLock());
+
+        lock.lock();
+        try {
+            // Execute database operations inside a transaction, but only after acquiring the lock
+            // This ensures threads wait for the lock WITHOUT holding a database connection
+            return transactionTemplate.execute(status -> {
+                Optional<E> existingKey = keysRepository.findFirstByCryptoTokenIdAndKeyAlgorithmAndInUse(
+                        cryptoToken.id(), keyAlgorithm, false
+                );
+
+                if (existingKey.isPresent()) {
+                    E entity = existingKey.get();
+                    entity.setAcquiredAt(ZonedDateTime.now());
+                    entity.setInUse(true);
+                    E savedEntity = keysRepository.save(entity);
+                    K key = this.mapEntityToSigningKey(savedEntity, cryptoToken);
+                    return Result.success(key);
+                } else {
+                    // If no key is found, generate a new one outside the transaction
+                    // Key generation involves calling SignServer API (slow I/O operation)
+                    status.setRollbackOnly();
+                    return Result.error(TextError.of("No available key found"));
+                }
+            });
+        } catch (Exception ex) {
+            // If no key was found, generate a new one
+            Result<K, TextError> generateResult = generateKey(cryptoToken, keyAlgorithm);
+            if (generateResult instanceof com.czertainly.csc.common.result.Error(var err)) {
+                return Result.error(err.extend(
+                        "New key couldn't be acquired from CryptoToken '%s'.",
+                        cryptoToken.identifier()
+                ));
+            }
+
+            K generatedKey = generateResult.unwrap();
+
+            // Mark the newly generated key as acquired in a separate transaction
+            return transactionTemplate.execute(status -> {
+                keysRepository.findById(generatedKey.id()).ifPresent(entity -> {
+                    entity.setAcquiredAt(ZonedDateTime.now());
+                    entity.setInUse(true);
+                    keysRepository.save(entity);
+                });
+                return Result.success(generatedKey);
+            });
+        } finally {
+            lock.unlock();
         }
     }
 
