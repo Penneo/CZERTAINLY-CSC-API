@@ -11,6 +11,7 @@ import com.czertainly.csc.signing.configuration.WorkerRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -23,9 +24,10 @@ public class OneTimeKeysService extends AbstractSigningKeysService<OneTimeKeyEnt
     private static final Logger logger = LoggerFactory.getLogger(OneTimeKeysService.class);
 
     public OneTimeKeysService(KeyRepository<OneTimeKeyEntity> keysRepository,
-                              SignserverClient signserverClient, WorkerRepository workerRepository
+                              SignserverClient signserverClient, WorkerRepository workerRepository,
+                              TransactionTemplate transactionTemplate
     ) {
-        super(keysRepository, signserverClient, workerRepository);
+        super(keysRepository, signserverClient, workerRepository, transactionTemplate);
     }
 
     public Result<List<OneTimeKey>, TextError> getKeysAcquiredBefore(ZonedDateTime before) {
